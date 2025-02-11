@@ -1,0 +1,8 @@
+gradio
+pandas
+requests
+pymupdf
+openai
+urllib3
+zipfile36
+openpyxl
