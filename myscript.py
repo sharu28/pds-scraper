@@ -12,7 +12,6 @@ from datetime import datetime
 # Disable SSL warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# -- NOTE: For security, do NOT store sensitive keys in code for production.
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 CSE_ID = os.getenv("CSE_ID")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -53,10 +52,18 @@ Validation Criteria:
 4. Recency check:
    - If the PDS date is after Jan 2023, return 100.
    - If before Jan 2023, deduct 25 points.
-   - If no date found, assume outdated and deduct 25.
+5. Multi-Product Documents: If multiple product names exist, but {product_name} is present, it is still valid.
 Response Format:
   - 100 | PDS date: D Month YYYY
   - or Score | Reason | PDS date: D Month YYYY
+  - If 100% certain, return only the score (100).
+  - If less than 100, return: {score} | {reason (<=20 words)}
+  - Example: 75 | Old date, APIR missing
+  - Example: 0 | Doc is a Target Market Determination - not a PDS
+  - Example: 0 | Doc is an Additional Application Form - not a PDS
+                                         
+Important: Keep reason short & clear, use abbreviations if needed.
+
 """
                 },
                 {"role": "user", "content": text[:15000]}  # truncate for safety
