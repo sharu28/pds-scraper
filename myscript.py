@@ -57,7 +57,7 @@ Response Format:
   - 100 | PDS date: D Month YYYY
   - or Score | Reason | PDS date: D Month YYYY
   - If 100% certain, return only the score (100).
-  - If less than 100, return: {score} | {reason (<=20 words)}
+  - If less than 100, return: <score> | <reason (<=20 words)>
   - Example: 75 | Old date, APIR missing
   - Example: 0 | Doc is a Target Market Determination - not a PDS
   - Example: 0 | Doc is an Additional Application Form - not a PDS
