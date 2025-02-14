@@ -45,28 +45,29 @@ def validate_pdf_with_ai(text, product_name, apir_code):
             messages=[
                 {
                     "role": "system",
-                    "content": f"""Analyze this text to determine if it's a valid Product Disclosure Statement (PDS) for {product_name} ({apir_code}).
+                    "content": f"""Analyze this text with the **primary objective of determining if it is a valid Product Disclosure Statement (PDS)** for {product_name} ({apir_code}). Identifying the document type is secondary and intended to assist with reasoning if invalid.
 
-Validation Criteria:
-1. Extract the PDS date if possible.
-2. Product name must match exactly {product_name}.
-3. APIR code must match {apir_code} if present.
-4. Recency check:
-   - If PDS date is after Jan 2023, return 100.
-   - If before Jan 2023, deduct 25 points.
-   - If not a PDS, return 0 with a reason.
+**Validation Criteria (Focus on PDS Validity):**
+1. **Product Name Match:** Must match {product_name} exactly.
+2. **APIR Code Match:** Must match {apir_code} if present.
+3. **Multiple Product Names:**  If multiple product names exist, but {product_name} is present, it is still valid.
+4. **Recency Check:**
+   - PDS date after Jan 2023: Score `100`
+   - PDS date before Jan 2023: Deduct `25`
+5. **Document Type Identification (Secondary):** Analyze title and context to determine type (e.g., TMD, Supplementary Prospectus). Return `Unknown reason` if unclear.
 
-Response Format:
-- Fully valid (score=100):  100 | PDS date: D Month YYYY
-- Partially valid (<100):   <score> | <reason> | PDS date: D Month YYYY
-- Invalid (score=0):        0 | <reason>
+**Scoring Rules:**
+- `100 | [blank] | PDS date: D Month YYYY` (Fully Valid)
+- `<score> | <reason> | PDS date:` (Partial Validity)
+- `0 | <reason>` (Invalid)
 
-Examples:
-100 | PDS date: 10 April 2023
-75 | Old date, APIR missing | PDS date: 15 March 2022
-0 | TMD - not a PDS
+**Examples:**
+- `100 | [blank] | PDS date: 10 April 2023`
+- `75 | Old date (-25) | PDS date: 15 March 2022`
+- `0 | Supplementary Prospectus – Not PDS`
+- `0 | Unknown reason`
 
-Important: Always provide a reason if score <100. Keep it short.
+**Important:** Primary goal: Validate PDS status. Provide reasons clearly if score <100, and return `Unknown reason` if document type is unclear.
 """
                 },
                 {"role": "user", "content": text[:15000]}  # truncate for safety
