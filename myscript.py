@@ -39,31 +39,34 @@ def validate_pdf_with_ai(text, product_name, apir_code):
     using your AI logic, and extract the PDS date.
     """
     try:
+        # 1) Simplify the system prompt for clearer AI instructions
         response = client.chat.completions.create(
             model="gpt-4o-mini-2024-07-18",
             messages=[
                 {
                     "role": "system",
                     "content": f"""Analyze this text to determine if it's a valid Product Disclosure Statement (PDS) for {product_name} ({apir_code}).
-Validation Criteria:
-1. Extract the PDS date.
-2. Product name must match exactly {product_name}.
-3. APIR code check must match {apir_code} if present.
-4. Recency check:
-   - If the PDS date is after Jan 2023, return 100.
-   - If before Jan 2023, deduct 25 points.
-5. Multi-Product Documents: If multiple product names exist, but {product_name} is present, it is still valid.
-Response Format:
-  - 100 | PDS date: D Month YYYY
-  - or Score | Reason | PDS date: D Month YYYY
-  - If 100% certain, return only the score (100).
-  - If less than 100, return: <score> | <reason (<=20 words)>
-  - Example: 75 | Old date, APIR missing
-  - Example: 0 | Doc is a Target Market Determination - not a PDS
-  - Example: 0 | Doc is an Additional Application Form - not a PDS
-                                         
-Important: Keep reason short & clear, use abbreviations if needed.
 
+Validation Criteria:
+1. Extract the PDS date if possible.
+2. Product name must match exactly {product_name}.
+3. APIR code must match {apir_code} if present.
+4. Recency check:
+   - If PDS date is after Jan 2023, return 100.
+   - If before Jan 2023, deduct 25 points.
+   - If not a PDS, return 0 with a reason.
+
+Response Format:
+- Fully valid (score=100):  100 | PDS date: D Month YYYY
+- Partially valid (<100):   <score> | <reason> | PDS date: D Month YYYY
+- Invalid (score=0):        0 | <reason>
+
+Examples:
+100 | PDS date: 10 April 2023
+75 | Old date, APIR missing | PDS date: 15 March 2022
+0 | TMD - not a PDS
+
+Important: Always provide a reason if score <100. Keep it short.
 """
                 },
                 {"role": "user", "content": text[:15000]}  # truncate for safety
@@ -71,15 +74,31 @@ Important: Keep reason short & clear, use abbreviations if needed.
         )
 
         content = response.choices[0].message.content.strip()
-        # Attempt to parse the custom response format
-        match = re.match(r"(\d+)\s*\|\s*([^|]*)\s*\|\s*PDS date:\s*(\d{1,2} [A-Za-z]+ \d{4})", content)
-        if match:
-            return int(match.group(1)), match.group(2).strip(), format_pds_date(match.group(3))
-        # Check for the 100-score pattern
+
+        # 2) Keep the original 3-part regex but also add a fallback 2-part for 'score | reason'
+        # Attempt to parse the custom response format with 3 parts
+        match_3 = re.match(r"(\d+)\s*\|\s*([^|]+)\s*\|\s*PDS date:\s*(\d{1,2} [A-Za-z]+ \d{4})", content)
+        if match_3:
+            score = int(match_3.group(1))
+            reason = match_3.group(2).strip()
+            raw_date = match_3.group(3).strip()
+            return score, reason, format_pds_date(raw_date)
+
+        # Check for the 100-score pattern with no reason
         match_100 = re.match(r"100\s*\|\s*PDS date:\s*(\d{1,2} [A-Za-z]+ \d{4})", content)
         if match_100:
             return 100, "", format_pds_date(match_100.group(1))
-        return 0, "Invalid AI response", ""
+
+        # Fallback: 2-part pattern (score | reason) if there's no PDS date included
+        match_2 = re.match(r"(\d+)\s*\|\s*(.*)", content)
+        if match_2:
+            score = int(match_2.group(1))
+            reason = match_2.group(2).strip()
+            return score, reason, ""
+
+        # If none of the above regexes matched, fallback with a short reason
+        return 0, "Couldn’t parse AI response", ""
+
     except Exception as e:
         return 0, f"Error: {e}", ""
 
@@ -201,7 +220,6 @@ def run_my_script(input_excel_path):
 
         # If valid, we assume it was downloaded
         if score == 100 and pdf_url != "Not found":
-            # Construct what the downloaded PDF path would be
             safe_product_name = re.sub(r'[\\/*?:"<>|]', "", row['Product name'])
             pdf_file_path = os.path.join(download_folder, f"{safe_product_name}.pdf")
             if os.path.exists(pdf_file_path):
