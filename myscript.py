@@ -160,7 +160,7 @@ def process_row(row, download_folder):
     return pdf_url, score, reason, pds_date
 
 
-def run_my_script(input_excel_path):
+def run_processing(input_excel_path):
     """
     Main entry point:
       - Read user-uploaded Excel from `input_excel_path`
